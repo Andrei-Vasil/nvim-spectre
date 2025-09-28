@@ -237,7 +237,48 @@ mod tests {
         Read::read_to_string(&mut file, &mut contents).unwrap();
         let mut lines = contents.lines();
         let line = lines.nth(9).unwrap();
-        println!("{line}");
         assert_eq!(line, "Not my favorite movie: spectre 1943.");
+    }
+
+    #[test]
+    fn test_replace_file_multiline() {
+        let file_path = "./tests/multiline.txt";
+        let tmp_file_path = "./tests/tmp/multiline.txt";
+        //copy file to tmp folder
+        let mut file = File::open(file_path).unwrap();
+        let mut contents = String::new();
+        Read::read_to_string(&mut file, &mut contents).unwrap();
+        let mut file = File::create(tmp_file_path).unwrap();
+        file.write_all(contents.as_bytes()).unwrap();
+
+        assert_eq!(
+            replace_file(
+                tmp_file_path.to_string(),
+                4,
+                r"hello\nworld".to_string(),
+                "hello\nuniverse".to_string(),
+            ),
+            true
+        );
+        let mut file = std::fs::File::open(&tmp_file_path).unwrap();
+        let mut contents = String::new();
+        Read::read_to_string(&mut file, &mut contents).unwrap();
+        let mut lines = contents.lines();
+        let line = lines.nth(4).unwrap();
+        assert_eq!(line, "universe");
+        lines = contents.lines();
+        let line = lines.nth(7).unwrap();
+        assert_ne!(line, "universe");
+        assert_eq!(line, "world");
+
+        assert_eq!(
+            replace_file(
+                tmp_file_path.to_string(),
+                1,
+                r"hello\nworld".to_string(),
+                "hello\nuniverse".to_string(),
+            ),
+            false
+        );
     }
 }
