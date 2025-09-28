@@ -89,50 +89,67 @@ fn replace_all(search_query: String, replace_query: String, text: String) -> Str
 
 /// Replace text on specify line number of file
 fn replace_file(file_path: String, lnum: i32, search_query: String, replace_query: String) -> bool {
-    if !File::open(&file_path).is_ok() {
-        return false;
-    }
+    let file = match File::open(&file_path) {
+        Ok(f) => f,
+        Err(_) => {
+            return false;
+        }
+    };
+
+    let reader = BufReader::new(file);
+    let lines: Result<Vec<String>, _> = reader.lines().collect();
+
+    let lines = match lines {
+        Ok(l) => l,
+        Err(_) => {
+            return false;
+        }
+    };
+
+    let before_lines: Vec<String> = lines.iter().take((lnum - 1) as usize).cloned().collect();
+
+    let search_area = lines
+        .iter()
+        .skip((lnum - 1) as usize)
+        .cloned()
+        .collect::<Vec<String>>()
+        .join("\n");
+
     let static_regex = get_static_regex(search_query);
     if static_regex.is_err() {
         return false;
     }
     let regex = static_regex.unwrap().lock().unwrap();
-    let file = File::open(&file_path);
-    if file.is_err() {
-        return false;
-    }
-    let f = BufReader::new(file.unwrap());
-    let mut lines: Vec<String> = Vec::new();
-    let mut is_modified = false;
 
-    // Is this good?
-    // I only want replace 1 line with another line
-    let mut line_number = 1;
-    for line in f.lines() {
-        // it only read a valid utf-8
-        if line.is_err() {
+    if let Ok(Some(match_obj)) = regex.find(&search_area) {
+        let first_newline = search_area.find('\n').unwrap_or(search_area.len());
+        if match_obj.start() > first_newline {
             return false;
         }
-        let text = line.unwrap();
-        if line_number == (lnum as usize) {
-            let new_line = regex.replace_all(&text, &replace_query).to_string();
-            if new_line != text {
-                is_modified = true;
-                lines.push(new_line);
+    }
+
+    let new_search_area = regex.replace(&search_area, &replace_query).to_string();
+
+    if new_search_area == search_area {
+        return false;
+    }
+
+    let mut final_lines = before_lines;
+    final_lines.extend(new_search_area.lines().map(String::from));
+
+    match File::create(&file_path) {
+        Ok(mut new_file) => {
+            if new_file
+                .write_all(final_lines.join("\n").as_bytes())
+                .is_ok()
+            {
+                true
             } else {
-                lines.push(text);
+                false
             }
-        } else {
-            lines.push(text);
         }
-        line_number += 1;
+        Err(_) => false,
     }
-    if is_modified {
-        let mut new_file = File::create(&file_path).unwrap();
-        new_file.write_all(lines.join("\n").as_bytes()).unwrap();
-        return true;
-    }
-    false
 }
 
 #[cfg(test)]
@@ -220,6 +237,7 @@ mod tests {
         Read::read_to_string(&mut file, &mut contents).unwrap();
         let mut lines = contents.lines();
         let line = lines.nth(9).unwrap();
+        println!("{line}");
         assert_eq!(line, "Not my favorite movie: spectre 1943.");
     }
 }
