@@ -6,7 +6,7 @@ oxi.init = function(_, config)
 end
 
 oxi.replace = function(self, value)
-    local cwd = value.cwd or vim.loop.cwd()
+    local cwd = value.cwd or vim.uv.cwd()
     if not value.filename:match('^%/') then
         value.filename = Path:new(cwd):joinpath(value.filename)
     end

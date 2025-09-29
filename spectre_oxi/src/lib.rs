@@ -128,7 +128,8 @@ fn replace_file(file_path: String, lnum: i32, search_query: String, replace_quer
         }
     }
 
-    let new_search_area = regex.replace(&search_area, &replace_query).to_string();
+    let processed_replace_query = replace_query.replace("\\n", "\n");
+    let new_search_area = regex.replace(&search_area, &processed_replace_query).to_string();
 
     if new_search_area == search_area {
         return false;
